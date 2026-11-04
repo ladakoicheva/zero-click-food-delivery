@@ -1,7 +1,7 @@
-import { menu } from "../../../data-mock/menu.js";
+import { listAvailableMenuItems } from '../../database/database.js'
+import { TtlCache } from '../../shared/cache/ttlCache.js'
 
-
-
+const suggestionsCache = new TtlCache(30_000)
 
 export const getMatchedItems = (request, response) => {
     const query = typeof request.query.q === 'string' ? request.query.q.trim().toLocaleLowerCase('en-US') : '';
@@ -9,8 +9,11 @@ export const getMatchedItems = (request, response) => {
       return response.status(400).json({ error: 'Enter at least two characters to find dishes.' });
     }
 
+    const cachedItems = suggestionsCache.get(query)
+    if (cachedItems) return response.json({ items: cachedItems, cached: true })
+
     const terms = query.split(/\s+/).filter((term) => term.length > 2);
-    const ranked = menu
+    const ranked = listAvailableMenuItems()
       .map((item) => {
         const searchable = `${item.name} ${item.description} ${item.restaurant} ${item.keywords.join(' ')}`.toLocaleLowerCase('en-US');
         const score = terms.reduce((total, term) => total + (searchable.includes(term) ? 1 : 0), 0);
@@ -31,5 +34,6 @@ export const getMatchedItems = (request, response) => {
       tag: item.tag,
     }));
 
-    return response.json({ items });
+    suggestionsCache.set(query, items)
+    return response.json({ items, cached: false });
   };
