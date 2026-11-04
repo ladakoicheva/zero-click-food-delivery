@@ -2,6 +2,7 @@ import  assert  from 'node:assert/strict'
 import { after, before, test } from 'node:test'
 import { createApp } from '../src/index.js'
 import { getOrderStatus } from '../src/modules/orders/helpers.js'
+import { TtlCache } from '../src/shared/cache/ttlCache.js'
 
 const app = createApp()
 let server
@@ -80,4 +81,17 @@ test('demo order statuses advance with elapsed time', () => {
   assert.equal(getOrderStatus(createdAt, createdAt + 15_000), 'cooking')
   assert.equal(getOrderStatus(createdAt, createdAt + 30_000), 'on_the_way')
   assert.equal(getOrderStatus(createdAt, createdAt + 60_000), 'delivered')
+})
+
+test('suggestion cache expires after its TTL', () => {
+  let now = 100
+  const cache = new TtlCache(50, () => now)
+  cache.set('query', ['result'])
+  assert.deepEqual(cache.get('query'), ['result'])
+  now = 150
+  assert.equal(cache.get('query'), undefined)
+})
+
+test('cache rejects invalid TTL values', () => {
+  assert.throws(() => new TtlCache(0), /positive number/)
 })
