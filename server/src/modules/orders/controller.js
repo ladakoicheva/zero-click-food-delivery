@@ -1,14 +1,12 @@
-import { menu } from "../../../data-mock/menu.js";
+import crypto from 'node:crypto';
+import { findMenuItem, findOrder, insertOrder } from '../../database/database.js'
 import { getOrderStatus } from "./helpers.js";
-import  crypto  from  'node:crypto';
-
-const orders = new Map();
 
 export const createOrder = (request, response) => {
   
   const PAYMENT_METHODS = new Set(['on_delivery', 'demo_card']);
   const { itemId, customerName, address, paymentMethod } = request.body || {}
-  const item = menu.find((candidate) => candidate.id === itemId)
+  const item = findMenuItem(itemId)
   if (!item) return response.status(400).json({ error: 'Choose a dish from the menu.' })
   if (typeof customerName !== 'string' || customerName.trim().length < 2 || customerName.trim().length > 80) {
     return response.status(400).json({ error: 'Enter a name between 2 and 80 characters.' })
@@ -37,18 +35,33 @@ export const createOrder = (request, response) => {
     },
     createdAt: new Date(createdAt).toISOString(),
   }
-  orders.set(trackingNumber, { ...order, createdAtMs: createdAt })
+  insertOrder({
+    trackingNumber,
+    customerName: order.customerName,
+    address: order.address,
+    paymentMethod: order.paymentMethod,
+    paymentStatus: order.paymentStatus,
+    status: order.status,
+    restaurantId: item.restaurant_id,
+    menuItemId: item.id,
+    totalAmount: item.price,
+    createdAt: order.createdAt,
+    createdAtMs: createdAt,
+  })
 
   return response.status(201).json({ order })
 }
 
 export const getStatus=(request, response) => {
-    const order = orders.get(request.params.trackingNumber);
-    if (!order) return response.status(404).json({ error: 'No order found with that tracking number.' });
-
-    const { createdAtMs, ...publicOrder } = order;
+    const storedOrder = findOrder(request.params.trackingNumber);
+    if (!storedOrder) return response.status(404).json({ error: 'No order found with that tracking number.' });
+    const { createdAtMs, itemId, itemName, itemRestaurant, itemPrice, ...publicOrder } = storedOrder;
     return response.json({
-      order: { ...publicOrder, status: getOrderStatus(createdAtMs) },
+      order: {
+        ...publicOrder,
+        status: getOrderStatus(createdAtMs),
+        item: { id: itemId, name: itemName, restaurant: itemRestaurant, price: itemPrice },
+      },
       demo: true,
     });
   };
