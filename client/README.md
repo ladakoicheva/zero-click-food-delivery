@@ -1,16 +1,40 @@
-# React + Vite
+# Spoon — food delivery demo
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Describe what you’re craving, choose a dish, enter a delivery address, and receive a demo tracking number.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+In the first terminal, from `server`:
 
-## React Compiler
+```sh
+npm install
+npm run dev
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+In a second terminal, from `client`:
 
-## Expanding the Oxlint configuration
+```sh
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+Open the URL printed by Vite (usually `http://localhost:5173`). Vite proxies `/api` requests to the Express server at `http://localhost:3000`.
+
+## Demo behavior
+
+- Dish suggestions use a local menu and keyword matching. Popular dishes are shown when there’s no exact match.
+- Orders are stored in server memory and disappear when the server restarts.
+- Payment methods are for demonstration only. Card details are never requested and no money is charged.
+- Tracking numbers and courier status updates are simulated; this is not a real delivery service.
+- Menu prices are displayed in US dollars.
+
+## Checks
+
+```sh
+# client
+npm run build
+npm run lint
+
+# server
+npm test
+```
