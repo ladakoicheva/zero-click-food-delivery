@@ -18,3 +18,9 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
