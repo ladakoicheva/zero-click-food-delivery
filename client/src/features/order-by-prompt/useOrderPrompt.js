@@ -1,31 +1,23 @@
-import { useState } from 'react'
-import { findSuggestions } from '../../shared/api/client'
+import { useDispatch, useSelector } from 'react-redux'
+import { searchSuggestions, setPromptError, setQuery } from './promptSlice'
 
 export function useOrderPrompt() {
-  const [query, setQuery] = useState('')
-  const [suggestions, setSuggestions] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const dispatch = useDispatch()
+  const { query, suggestions, status, error } = useSelector((state) => state.prompt)
 
-  async function submitPrompt(event) {
+  function submitPrompt(event) {
     event.preventDefault()
     if (!query.trim()) {
-      setError('Tell us what you’re craving and we’ll find something for you.')
+      dispatch(setPromptError('Tell us what you’re craving and we’ll find something for you.'))
       return
     }
 
-    setLoading(true)
-    setError('')
-    try {
-      const data = await findSuggestions(query.trim())
-      setSuggestions(data.items)
-      if (data.items.length === 0) setError('No exact matches yet. Try describing what you’re craving another way.')
-    } catch (requestError) {
-      setError(requestError.message || 'Could not connect to the server.')
-    } finally {
-      setLoading(false)
-    }
+    dispatch(searchSuggestions(query.trim()))
   }
 
-  return { query, setQuery, suggestions, loading, error, submitPrompt }
+  function updateQuery(value) {
+    dispatch(setQuery(value))
+  }
+
+  return { query, setQuery: updateQuery, suggestions, loading: status === 'loading', error, submitPrompt }
 }

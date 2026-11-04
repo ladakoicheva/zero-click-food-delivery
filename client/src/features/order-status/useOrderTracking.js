@@ -1,23 +1,18 @@
-import { useEffect, useState } from 'react'
-import { getOrder } from '../../shared/api/client'
+import { useEffect } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
+import { refreshOrder } from '../../entities/order/orderSlice'
 
-export function useOrderTracking(order, setOrder) {
-  const [trackingError, setTrackingError] = useState('')
+export function useOrderTracking(order) {
+  const dispatch = useDispatch()
+  const trackingError = useSelector((state) => state.order.trackingError)
 
   useEffect(() => {
     if (!order?.trackingNumber) return undefined
-    const refreshOrder = async () => {
-      try {
-        const data = await getOrder(order.trackingNumber)
-        setOrder(data.order)
-        setTrackingError('')
-      } catch {
-        setTrackingError('Could not refresh the status. Showing the latest available update.')
-      }
-    }
-    const intervalId = window.setInterval(refreshOrder, 5000)
+    const intervalId = window.setInterval(() => {
+      dispatch(refreshOrder(order.trackingNumber))
+    }, 5000)
     return () => window.clearInterval(intervalId)
-  }, [order?.trackingNumber, setOrder])
+  }, [dispatch, order?.trackingNumber])
 
   return trackingError
 }
