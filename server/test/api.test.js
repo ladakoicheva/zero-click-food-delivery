@@ -1,6 +1,7 @@
-const assert = require('node:assert/strict')
-const { after, before, test } = require('node:test')
-const { createApp, getOrderStatus } = require('../src/index')
+import  assert  from 'node:assert/strict'
+import { after, before, test } from 'node:test'
+import { createApp } from '../src/index.js'
+import { getOrderStatus } from '../src/modules/orders/helpers.js'
 
 const app = createApp()
 let server
