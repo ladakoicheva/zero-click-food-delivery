@@ -39,10 +39,18 @@ const CATEGORY_PHOTOS = {
   default:    'photo-1504674900247-0877df9cc836',
 }
 
-function photoForCategory(category = '') {
-  const lower = category.toLowerCase()
-  return Object.entries(CATEGORY_PHOTOS).find(([key]) => lower.includes(key))?.[1]
-    ?? CATEGORY_PHOTOS.default
+// Prefer dish formats over their fillings (for example, "chicken wrap" should
+// use the wrap photo). Ingredient-only names still use the matching category.
+const PHOTO_KEYWORD_PRIORITY = [
+  'burger', 'pizza', 'pasta', 'sushi', 'ramen', 'curry', 'soup', 'salad',
+  'bowl', 'sandwich', 'wrap', 'kebab', 'steak', 'chicken', 'fish', 'seafood',
+]
+
+/** Return a mapped photo for a dish name or category, without applying default. */
+function photoKeyForName(text = '') {
+  const lower = text.toLowerCase()
+  const keyword = PHOTO_KEYWORD_PRIORITY.find((key) => lower.includes(key))
+  return keyword ? CATEGORY_PHOTOS[keyword] ?? null : null
 }
 
 // ─── Groq LLM call ────────────────────────────────────────────────────────────
@@ -111,7 +119,7 @@ Return a JSON object with key "items" containing an array of exactly 3 objects, 
       price: Number(item.price) || 12,
       rating: String(item.rating ?? '4.5'),
       time: `${item.prepTime ?? 20}–${(item.prepTime ?? 20) + 10} min`,
-      image: photoForCategory(category),
+      image: photoKeyForName(item.name) ?? photoKeyForName(category) ?? CATEGORY_PHOTOS.default,
       tag: item.tag ?? 'Popular',
       dietary: item.dietary ?? [],
       lat: restaurant.lat,
