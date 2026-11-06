@@ -25,9 +25,9 @@ export function HomePage() {
   const trackingError = useOrderTracking(order)
   const feed = usePollFeed()
 
-  // Priority: user's search results → live polled feed → static fallback
+  // Use backend/LLM results after search; feed is shown before the first search.
   const feedItems = feed.items.length ? feed.items : defaultMenuItems
-  const items = prompt.suggestions.length ? prompt.suggestions : feedItems
+  const items = prompt.status === 'succeeded' ? prompt.suggestions : feedItems
 
   async function submitOrder(event) {
     event.preventDefault()

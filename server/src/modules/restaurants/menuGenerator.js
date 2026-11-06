@@ -30,7 +30,7 @@ const CATEGORY_PHOTOS = {
   salad:      'photo-1512621776951-a57141f2eefd',
   bowl:       'photo-1512621776951-a57141f2eefd',
   steak:      'photo-1546964124-0cce460f38ef',
-  chicken:    'photo-1598103442097-8b74394b95c3',
+  chicken:    'photo-1606755962773-d324e0a13086',
   fish:       'photo-1467003909585-2f8a72700288',
   seafood:    'photo-1563379926898-05f4575a45d8',
   sandwich:   'photo-1509722747041-616f39b57569',
