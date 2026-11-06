@@ -8,6 +8,7 @@ import { FoodGrid } from '../features/order-by-prompt/FoodGrid'
 import { OrderSummary } from '../features/order-by-prompt/OrderSummary'
 import { PromptHero } from '../features/order-by-prompt/PromptHero'
 import { useOrderPrompt } from '../features/order-by-prompt/useOrderPrompt'
+import { usePollFeed } from '../features/order-by-prompt/usePollFeed'
 import { OrderStatus } from '../features/order-status/OrderStatus'
 import { useOrderTracking } from '../features/order-status/useOrderTracking'
 import '../App.css'
@@ -22,7 +23,11 @@ export function HomePage() {
   const form = useSelector((state) => state.user)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const trackingError = useOrderTracking(order)
-  const items = prompt.suggestions.length ? prompt.suggestions : defaultMenuItems
+  const feed = usePollFeed()
+
+  // Priority: user's search results → live polled feed → static fallback
+  const feedItems = feed.items.length ? feed.items : defaultMenuItems
+  const items = prompt.suggestions.length ? prompt.suggestions : feedItems
 
   async function submitOrder(event) {
     event.preventDefault()
