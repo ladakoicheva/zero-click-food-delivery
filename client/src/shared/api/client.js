@@ -9,6 +9,20 @@ export function findSuggestions(query) {
   return request(`/api/suggestions?q=${encodeURIComponent(query)}`)
 }
 
+/**
+ * Fetch the live menu feed for polling.
+ * Passes the current ETag so the server can return 304 when nothing changed.
+ */
+export async function fetchFeed(etag = null) {
+  const headers = {}
+  if (etag) headers['If-None-Match'] = etag
+  const response = await fetch('/api/restaurants/feed', { headers })
+  // 304 = nothing changed — caller handles this
+  if (response.status === 304) return null
+  if (!response.ok) throw new Error('Feed request failed.')
+  return response.json()
+}
+
 export function createOrder(orderData) {
   return request('/api/orders', {
     method: 'POST',
