@@ -1,12 +1,15 @@
 import { searchRestaurants, matchMenuItems } from './service.js'
+import { generateMenuItems } from './menuGenerator.js'
 import { normalizeQuery } from '../llm/service.js'
 
 /**
  * GET /api/restaurants?lat=50.45&lng=30.52&q=spicy+chicken
  *
- * Searches for open restaurants in Kyiv Oblast near the given coordinates
- * (defaults to Kyiv city centre).  Also matches menu items when `q` is
- * supplied (after normalising it through the LLM pipeline).
+ * Pipeline:
+ *  1. Normalise raw query → structured intent (LLM or regex)
+ *  2. Geo-search Kyiv Oblast → list of open restaurants with coords
+ *  3a. LLM generates realistic menus per discovered venue  (primary)
+ *  3b. SQLite keyword matching                             (fallback)
  *
  * Response shape:
  * {
@@ -14,7 +17,8 @@ import { normalizeQuery } from '../llm/service.js'
  *   items:       [{ id, name, restaurant, price, ..., lat, lng }],
  *   markers:     [{ name, lat, lng }],   ← ready for the map
  *   intent:      { cleanQuery, category, dietary, maxBudget, speedPriority },
- *   source:      'google' | 'local',
+ *   menuSource:  'llm' | 'fallback',
+ *   source:      'foursquare' | 'local',
  *   cached:      boolean
  * }
  */
@@ -33,17 +37,29 @@ export async function getRestaurantsAndMenu(request, response) {
   const keyword = intent?.category || rawQuery || undefined
   const geoResult = await searchRestaurants({ lat: searchLat, lng: searchLng, keyword })
 
-  // 3. Match menu items if we have an intent
-  const matchResult = intent
-    ? matchMenuItems(intent)
-    : { items: [], markers: [], cached: false }
+  // 3. Menu items — try LLM generation first, fall back to SQLite matching
+  let menuResult = null
+
+  if (intent) {
+    // 3a. Ask LLM to generate menus for the discovered restaurants
+    menuResult = await generateMenuItems(geoResult.restaurants, intent)
+  }
+
+  if (!menuResult) {
+    // 3b. Fallback: keyword match against local SQLite menu
+    const fallback = intent
+      ? matchMenuItems(intent)
+      : { items: [], markers: [], cached: false }
+    menuResult = { ...fallback, source: 'fallback' }
+  }
 
   return response.json({
     restaurants: geoResult.restaurants,
-    items: matchResult.items,
-    markers: matchResult.markers,
+    items: menuResult.items,
+    markers: menuResult.markers,
     intent,
+    menuSource: menuResult.source,   // 'llm' or 'fallback'
     source: geoResult.source,
-    cached: geoResult.cached || matchResult.cached,
+    cached: geoResult.cached ?? false,
   })
 }
