@@ -234,7 +234,7 @@ export const menu = [
     lat: 50.5112, lng: 30.6012,
     description: 'Crispy wings, smoky BBQ glaze, blue cheese dip',
     price: 14.0, rating: '4.7', time: '30',
-    image: 'photo-1598103442097-8b74394b95c3',
+    image: 'photo-1606755962773-d324e0a13086',
     tag: 'Game day',
     keywords: ['wings', 'chicken', 'bbq', 'spicy', 'crispy', 'meat'],
   },

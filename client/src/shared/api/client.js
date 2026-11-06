@@ -5,8 +5,13 @@ async function request(url, options) {
   return data
 }
 
-export function findSuggestions(query) {
-  return request(`/api/suggestions?q=${encodeURIComponent(query)}`)
+export function findSuggestions({ query, lat, lng }) {
+  const params = new URLSearchParams({
+    q: query,
+    lat: String(lat),
+    lng: String(lng),
+  })
+  return request(`/api/restaurants?${params}`)
 }
 
 /**
