@@ -1,6 +1,7 @@
 import { searchRestaurants, matchMenuItems } from './service.js'
 import { generateMenuItems } from './menuGenerator.js'
 import { normalizeQuery } from '../llm/service.js'
+import { saveGeneratedMenuItems } from '../../database/database.js'
 
 /**
  * GET /api/restaurants?lat=50.45&lng=30.52&q=spicy+chicken
@@ -51,6 +52,10 @@ export async function getRestaurantsAndMenu(request, response) {
       ? matchMenuItems(intent)
       : { items: [], markers: [], cached: false }
     menuResult = { ...fallback, source: 'fallback' }
+  }
+
+  if (menuResult.source === 'llm') {
+    saveGeneratedMenuItems(menuResult.items)
   }
 
   return response.json({
