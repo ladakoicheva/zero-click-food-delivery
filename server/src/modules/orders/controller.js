@@ -20,7 +20,7 @@ export const createOrder = (request, response) => {
     const generated = findGeneratedItem(id)
     return { item: generated ?? findMenuItem(id), generated: Boolean(generated) }
   })
-  if (entries.some(({ item }) => !item)) return response.status(400).json({ error: 'Choose a dish from the menu.' })
+  if (entries.some(({ item }) => !item)) return response.status(400).json({ error: 'Some selected dishes are no longer available. Remove them or search again.' })
   const item = entries[0].item
   if (typeof customerName !== 'string' || customerName.trim().length < 2 || customerName.trim().length > 80) {
     return response.status(400).json({ error: 'Enter a name between 2 and 80 characters.' })
