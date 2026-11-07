@@ -14,9 +14,25 @@
  */
 
 import { TtlCache } from '../../shared/cache/ttlCache.js'
+import { SingleFlight } from '../../shared/cache/singleFlight.js'
+import {
+  groqMenuGenerationLimiter,
+  QueueFullError,
+  QueueTimeoutError,
+} from '../../shared/concurrencyLimiter.js'
+import {
+  countCache,
+  measureProvider,
+  recordProviderQueue,
+  recordProviderQueueOutcome,
+  recordSingleFlight,
+  recordRestaurantCall,
+  startTiming,
+} from '../../shared/performanceMetrics.js'
 
 // Cache generated menus for 10 minutes per restaurant+intent combo
 const generatedMenuCache = new TtlCache(10 * 60_000)
+const menuGenerationSingleFlight = new SingleFlight()
 
 // Unsplash photo IDs mapped to food categories — used for realistic images
 const CATEGORY_PHOTOS = {
@@ -39,10 +55,18 @@ const CATEGORY_PHOTOS = {
   default:    'photo-1504674900247-0877df9cc836',
 }
 
-function photoForCategory(category = '') {
-  const lower = category.toLowerCase()
-  return Object.entries(CATEGORY_PHOTOS).find(([key]) => lower.includes(key))?.[1]
-    ?? CATEGORY_PHOTOS.default
+// Prefer dish formats over their fillings (for example, "chicken wrap" should
+// use the wrap photo). Ingredient-only names still use the matching category.
+const PHOTO_KEYWORD_PRIORITY = [
+  'burger', 'pizza', 'pasta', 'sushi', 'ramen', 'curry', 'soup', 'salad',
+  'bowl', 'sandwich', 'wrap', 'kebab', 'steak', 'chicken', 'fish', 'seafood',
+]
+
+/** Return a mapped photo for a dish name or category, without applying default. */
+function photoKeyForName(text = '') {
+  const lower = text.toLowerCase()
+  const keyword = PHOTO_KEYWORD_PRIORITY.find((key) => lower.includes(key))
+  return keyword ? CATEGORY_PHOTOS[keyword] ?? null : null
 }
 
 // ─── Groq LLM call ────────────────────────────────────────────────────────────
@@ -111,7 +135,7 @@ Return a JSON object with key "items" containing an array of exactly 3 objects, 
       price: Number(item.price) || 12,
       rating: String(item.rating ?? '4.5'),
       time: `${item.prepTime ?? 20}–${(item.prepTime ?? 20) + 10} min`,
-      image: photoForCategory(category),
+      image: photoKeyForName(item.name) ?? photoKeyForName(category) ?? CATEGORY_PHOTOS.default,
       tag: item.tag ?? 'Popular',
       dietary: item.dietary ?? [],
       lat: restaurant.lat,
@@ -134,24 +158,96 @@ Return a JSON object with key "items" containing an array of exactly 3 objects, 
  * @param {number}       [limit=6]    — max total items to return
  * @returns {Promise<{ items: MenuItem[], markers: MapMarker[], source: 'llm'|'fallback' }>}
  */
-export async function generateMenuItems(restaurants, intent, limit = 6) {
-  const { category = '', dietary = [], maxBudget = null } = intent
+export async function generateMenuItems(restaurants, intent, limit = 6, metrics = null) {
+  const { cleanQuery = '', category = '', dietary = [], maxBudget = null } = intent
 
   // Generate menus for up to 4 restaurants in parallel
   const targets = restaurants.slice(0, 4)
 
   const results = await Promise.all(
-    targets.map(async (restaurant) => {
-      const cacheKey = `gen|${restaurant.name}|${category}|${dietary.join(',')}|${maxBudget}`
+    targets.map(async (restaurant, index) => {
+      const startedAt = startTiming(metrics)
+      let outcome = 'exception'
+      const cacheKey = JSON.stringify([
+        restaurant.id,
+        restaurant.name,
+        restaurant.lat,
+        restaurant.lng,
+        category,
+        dietary,
+        maxBudget,
+        cleanQuery,
+      ])
       const cached = generatedMenuCache.get(cacheKey)
-      if (cached) return cached
-
-      const items = await generateMenuViaGroq(restaurant, intent)
-      if (items) {
-        generatedMenuCache.set(cacheKey, items)
-        return items
+      countCache(metrics, 'generatedMenu', Boolean(cached))
+      if (cached) {
+        outcome = 'cache_hit'
+        recordRestaurantCall(metrics, index, startedAt, outcome)
+        return cached
       }
-      return null
+
+      const flightStartedAt = metrics ? startTiming(metrics) : null
+      const flight = menuGenerationSingleFlight.runWithStatus(cacheKey, async () => {
+        const configured = Boolean(process.env.GROQ_API_KEY)
+        const operation = () => measureProvider(
+          metrics,
+          'groq_menu',
+          configured,
+          () => generateMenuViaGroq(restaurant, intent),
+          index,
+        )
+        let generated
+        if (configured) {
+          try {
+            generated = await groqMenuGenerationLimiter.run(
+              operation,
+              metrics
+                ? ({ queueWaitMs, queueLength }) =>
+                  recordProviderQueue(metrics, 'groq_menu', queueWaitMs, queueLength)
+                : null,
+            )
+          } catch (error) {
+            if (error instanceof QueueFullError || error instanceof QueueTimeoutError) {
+              recordProviderQueueOutcome(
+                metrics,
+                'groq_menu',
+                error instanceof QueueFullError ? 'queue_rejected' : 'queue_timeout',
+                error.queueWaitMs,
+                error.queueDepth,
+              )
+              return null
+            }
+            throw error
+          }
+        } else {
+          generated = await operation()
+        }
+
+        if (generated) generatedMenuCache.set(cacheKey, generated)
+        return generated
+      })
+
+      let flightOutcome = 'failure'
+      try {
+        const items = await flight.promise
+        if (items) {
+          outcome = 'generated'
+          flightOutcome = 'success'
+          return items
+        }
+        outcome = process.env.GROQ_API_KEY ? 'no_result' : 'skipped_unconfigured'
+        flightOutcome = 'fallback'
+        return null
+      } finally {
+        recordSingleFlight(
+          metrics,
+          'menu_generation',
+          flight.joined ? 'joined' : 'started',
+          flightStartedAt,
+          flightOutcome,
+        )
+        if (!flight.joined) recordRestaurantCall(metrics, index, startedAt, outcome)
+      }
     }),
   )
 
