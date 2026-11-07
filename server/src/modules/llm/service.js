@@ -18,9 +18,17 @@
 
 import { TtlCache } from '../../shared/cache/ttlCache.js'
 import { foodTerms } from '../../shared/foodDictionary.js'
+import { SingleFlight } from '../../shared/cache/singleFlight.js'
+import {
+  countCache,
+  measureProvider,
+  recordSingleFlight,
+  startTiming,
+} from '../../shared/performanceMetrics.js'
 
 // ─── Cache: 60 s TTL so repeated identical noisy queries don't hit the API ───
 const normalizeCache = new TtlCache(60_000)
+const normalizeSingleFlight = new SingleFlight()
 
 // ─── JSON schema that OpenAI must return (Structured Outputs) ─────────────────
 const RESPONSE_SCHEMA = {
@@ -214,19 +222,38 @@ async function callOpenAI(rawText) {
  *                     maxBudget: number|null, speedPriority: boolean,
  *                     source: 'llm'|'fallback' }>}
  */
-export async function normalizeQuery(rawText) {
+export async function normalizeQuery(rawText, metrics = null) {
   const cacheKey = rawText
   const cached = normalizeCache.get(cacheKey)
+  countCache(metrics, 'normalization', Boolean(cached))
   if (cached) return { ...cached, cached: true }
 
-  // Try providers in order: Groq → Gemini Flash → OpenAI → regex fallback
-  const llmResult =
-    (await callGroq(rawText)) ??
-    (await callGemini(rawText)) ??
-    (await callOpenAI(rawText))
-  const source = llmResult ? 'llm' : 'fallback'
-  const result = { ...(llmResult ?? regexNormalize(rawText)), source, cached: false }
+  const startedAt = metrics ? startTiming(metrics) : null
+  const flight = normalizeSingleFlight.runWithStatus(cacheKey, async () => {
+    // Try providers in order: Groq → Gemini Flash → OpenAI → regex fallback
+    const llmResult =
+      (await measureProvider(metrics, 'groq', Boolean(process.env.GROQ_API_KEY), () => callGroq(rawText))) ??
+      (await measureProvider(metrics, 'gemini', Boolean(process.env.GEMINI_API_KEY), () => callGemini(rawText))) ??
+      (await measureProvider(metrics, 'openai', Boolean(process.env.OPENAI_API_KEY), () => callOpenAI(rawText)))
+    const source = llmResult ? 'llm' : 'fallback'
+    const result = { ...(llmResult ?? regexNormalize(rawText)), source, cached: false }
 
-  normalizeCache.set(cacheKey, result)
-  return result
+    normalizeCache.set(cacheKey, result)
+    return result
+  })
+
+  let outcome = 'failure'
+  try {
+    const result = await flight.promise
+    outcome = result.source === 'fallback' ? 'fallback' : 'success'
+    return result
+  } finally {
+    recordSingleFlight(
+      metrics,
+      'normalization',
+      flight.joined ? 'joined' : 'started',
+      startedAt,
+      outcome,
+    )
+  }
 }
