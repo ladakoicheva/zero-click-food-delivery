@@ -27,9 +27,9 @@ export function HomePage() {
   const form = useSelector((state) => state.user)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
-  const [selectedCartIds, setSelectedCartIds] = useState([])
+  const { items: cartItems, storageError, addItem, removeItem } = useCart()
+  const [selectedCartIds, setSelectedCartIds] = useState(() => cartItems.map((item) => item.id))
   const [checkoutItems, setCheckoutItems] = useState([])
-  const { items: cartItems, addItem, removeItem } = useCart()
   const trackingError = useOrderTracking(order)
   const startupMenu = useStartupMenu()
 
@@ -109,6 +109,7 @@ export function HomePage() {
           </div>
         </div>
       </header>
+      {storageError && <p className="mx-auto max-w-7xl px-5 pt-3 text-sm text-[#a04532] sm:px-8" role="alert">{storageError}</p>}
       {page}
       {checkoutOpen && checkoutItems.length > 0 && <CheckoutModal error={orderError} form={form} items={checkoutItems} placing={placing} setForm={(nextForm) => dispatch(updateProfile(nextForm))} onClose={() => setCheckoutOpen(false)} onSubmit={submitOrder} />}
     </div>

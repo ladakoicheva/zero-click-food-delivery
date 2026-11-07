@@ -51,6 +51,7 @@ test('invalid, duplicate, unavailable or ambiguous selections fail without creat
     createOrder({ body: { ...customer, ...fields } }, result)
     assert.equal(result.statusCode, 400)
     assert.ok(result.body.error)
+    if (fields.itemIds?.includes('missing')) assert.match(result.body.error, /no longer available/)
   }
   assert.equal(database.prepare('SELECT COUNT(*) AS count FROM orders').get().count, before)
 })

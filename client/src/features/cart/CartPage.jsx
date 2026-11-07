@@ -23,6 +23,7 @@ export function CartPage({ items, selectedIds, onBack, onRemove, onSelectionChan
           </div>
         ) : (
           <div className="mt-8 space-y-4">
+            {items.some((item) => item.id.startsWith('generated-')) && <p className="text-sm text-[#626960]">Search results may expire after a server restart. If a dish is unavailable, search for it again.</p>}
             <label className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-sm font-semibold text-[#456749]">
               <input type="checkbox" checked={allSelected} onChange={(event) => onSelectionChange(event.target.checked ? items.map((item) => item.id) : [])} />
               Select all
