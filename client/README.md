@@ -47,7 +47,7 @@ Google controls the map search results and iframe availability. The iframe does 
 - The startup menu contains only dishes from `server/data-mock/menu.js`. Older generated dishes remain in the database but are hidden from the menu and cannot be ordered.
 - Generated search dishes and their orders are kept in server memory and disappear when the server restarts. Orders for startup-menu dishes are stored in SQLite.
 - Select individual dishes or all dishes in the cart to create one demo order. Orders containing multiple dishes are kept in server memory and disappear on restart; single startup-menu orders still use SQLite.
-- Generated food images rotate through finite category-specific photo pools; categories without multiple photos may repeat.
+- Generated food images rotate through finite category-specific photo pools. Each category has at least three photos, so images repeat once the pool is exhausted; photos are illustrative, not exact representations of generated ingredients.
 - Payment methods are for demonstration only. Card details are never requested and no money is charged.
 - Tracking numbers and courier status updates are simulated; this is not a real delivery service.
 - Menu prices are displayed in US dollars.

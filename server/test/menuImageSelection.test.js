@@ -141,3 +141,45 @@ test('pizza photos vary across restaurants and remain stable on cache hits', asy
     else process.env.GROQ_API_KEY = originalGroqKey
   }
 })
+
+test('every category rotates at least three photos without extra provider requests', async () => {
+  const categories = [
+    'burger', 'pizza', 'pasta', 'sushi', 'ramen', 'curry', 'soup', 'salad',
+    'bowl', 'sandwich', 'wrap', 'kebab', 'steak', 'chicken', 'fish', 'seafood', 'unmapped',
+  ]
+  const originalFetch = globalThis.fetch
+  const originalGroqKey = process.env.GROQ_API_KEY
+  let fetchCalls = 0
+  process.env.GROQ_API_KEY = 'menu-image-regression-test-only'
+  globalThis.fetch = async () => {
+    fetchCalls++
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({
+          items: Array.from({ length: 4 }, (_, index) => ({
+            id: `item-${index}`, name: 'Chef Tasting Plate', price: 15, prepTime: 20,
+          })),
+        }) } }],
+      }),
+    }
+  }
+
+  try {
+    for (const category of categories) {
+      const restaurant = { id: `photo-${category}`, name: `Photo ${category}`, lat: 50.45, lng: 30.52 }
+      const intent = { cleanQuery: `photo variety ${category}`, category, dietary: [], maxBudget: null }
+      const first = await generateMenuItems([restaurant], intent)
+      const repeated = await generateMenuItems([restaurant], intent)
+      const photos = first.items.map((item) => item.image)
+      assert.equal(new Set(photos.slice(0, 3)).size, 3, category)
+      if (category !== 'pizza') assert.equal(photos[3], photos[0], category)
+      assert.deepEqual(repeated.items.map((item) => item.image), photos, category)
+    }
+    assert.equal(fetchCalls, categories.length)
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalGroqKey === undefined) delete process.env.GROQ_API_KEY
+    else process.env.GROQ_API_KEY = originalGroqKey
+  }
+})
