@@ -42,10 +42,12 @@ const orderSlice = createSlice({
         state.error = action.error.message || 'Could not place your order.'
       })
       .addCase(refreshOrder.fulfilled, (state, action) => {
+        if (state.current?.trackingNumber !== action.meta.arg) return
         state.current = action.payload.order
         state.trackingError = ''
       })
-      .addCase(refreshOrder.rejected, (state) => {
+      .addCase(refreshOrder.rejected, (state, action) => {
+        if (state.current?.trackingNumber !== action.meta.arg) return
         state.trackingError = 'Could not refresh the status. Showing the latest available update.'
       })
   },
