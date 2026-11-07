@@ -42,9 +42,11 @@ Google controls the map search results and iframe availability. The iframe does 
 ## Demo behavior
 
 - The startup menu is shown initially and immediately when the search field is cleared. Search runs when the form is submitted; clearing the field ignores any pending search response.
+- During a search, the button shows a loading spinner and a status message appears below the form. The indicators follow the existing request state and do not add a delay or extra requests; the server may use its local fallback instead of AI.
 - Dish searches accept terms in a limited food dictionary (English, Ukrainian and Russian). Unrecognized queries return no match. The existing restaurant search can still generate demo dishes for recognized requests.
 - The startup menu contains only dishes from `server/data-mock/menu.js`. Older generated dishes remain in the database but are hidden from the menu and cannot be ordered.
 - Generated search dishes and their orders are kept in server memory and disappear when the server restarts. Orders for startup-menu dishes are stored in SQLite.
+- Select individual dishes or all dishes in the cart to create one demo order. Orders containing multiple dishes are kept in server memory and disappear on restart; single startup-menu orders still use SQLite.
 - Generated food images rotate through finite category-specific photo pools; categories without multiple photos may repeat.
 - Payment methods are for demonstration only. Card details are never requested and no money is charged.
 - Tracking numbers and courier status updates are simulated; this is not a real delivery service.
