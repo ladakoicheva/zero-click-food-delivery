@@ -23,14 +23,13 @@ If the backend runs on a different port, start Vite with `API_PROXY_TARGET=http:
 
 ## Sign in
 
-Firebase Authentication sends an email sign-in link; an enrolled Google Authenticator supplies the second factor. A new user must verify their email, scan the displayed QR code (or enter its key), then enter the current code. On later sign-ins, open a fresh email link and enter an Authenticator code. When the email link is opened on another device, enter the same email address there. Firebase stores the account and enrolled factor; the browser SDK stores its session.
+Firebase Authentication sends an email sign-in link. Open the link and confirm the email address to sign in. When the link is opened on another device, enter the same email address there. Firebase stores the account; the browser SDK stores its session. Authenticator setup is not required.
 
 1. Create a Firebase project and register a web app. Copy its web configuration to the ignored `client/.env` using `client/.env.example`. The web API key identifies the project and is not a service-account secret; never put service-account keys in the frontend.
 2. In Firebase Authentication, enable **Email/Password** and **Email link (passwordless sign-in)**. Add the frontend domain under Authentication → Settings → Authorized domains. New projects do not authorize `localhost` automatically.
-3. Upgrade Firebase Authentication to **Identity Platform** and enable TOTP MFA in project configuration. Follow Google's [TOTP setup guide](https://firebase.google.com/docs/auth/web/totp-mfa); upgrading can have billing implications. Use HTTPS for deployed sites.
-4. Restart Vite after setting the variables. Open the configured frontend origin and request a link. Firebase must be reachable and its email sending quotas apply.
+3. Restart Vite after setting the variables. Open the configured frontend origin and request a link. Firebase must be reachable and its email sending quotas apply. Use HTTPS for deployed sites.
 
-This is a demo identity UI, not authorization for the ordering API: existing orders are not associated with users, and the backend does not verify Firebase tokens. Firebase creates a signed-in session after the first email link, before TOTP enrollment; the UI requires setup, but this is not server-side MFA enforcement. Do not treat demo endpoints as protected. No account-recovery flow is implemented; losing the Authenticator factor may prevent sign-in.
+This is a demo identity UI, not authorization for the ordering API: existing orders are not associated with users, and the backend does not verify Firebase tokens. Do not treat demo endpoints as protected. Accounts that already have MFA enrolled require a separate supported MFA sign-in or recovery flow.
 
 ## Nearby restaurants
 

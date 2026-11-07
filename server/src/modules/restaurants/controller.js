@@ -2,7 +2,6 @@ import { searchRestaurants, matchMenuItems } from './service.js'
 import { generateMenuItems } from './menuGenerator.js'
 import { normalizeQuery } from '../llm/service.js'
 import { saveGeneratedMenuItems } from '../../database/database.js'
-import { measureStage, startPerfTrace } from '../../shared/performanceMetrics.js'
 import { foodTerms } from '../../shared/foodDictionary.js'
 
 /**
@@ -26,7 +25,6 @@ import { foodTerms } from '../../shared/foodDictionary.js'
  * }
  */
 export async function getRestaurantsAndMenu(request, response) {
-  const metrics = startPerfTrace(request, response)
   const lat = Number.parseFloat(request.query.lat)
   const lng = Number.parseFloat(request.query.lng)
   const rawQuery = typeof request.query.q === 'string' ? request.query.q.trim() : ''
@@ -39,30 +37,24 @@ export async function getRestaurantsAndMenu(request, response) {
   const searchLng = Number.isFinite(lng) ? lng : undefined
 
   // 1. Normalise the query through the LLM (or regex fallback)
-  const intent = rawQuery
-    ? await measureStage(metrics, 'normalizationMs', () => normalizeQuery(rawQuery, metrics))
-    : null
+  const intent = rawQuery ? await normalizeQuery(rawQuery) : null
 
   // 2. Geo-search — use the intent's category as keyword when available
   const keyword = intent?.category || rawQuery || undefined
-  const geoResult = await measureStage(metrics, 'restaurantSearchMs', () =>
-    searchRestaurants({ lat: searchLat, lng: searchLng, keyword }, metrics),
-  )
+  const geoResult = await searchRestaurants({ lat: searchLat, lng: searchLng, keyword })
 
   // 3. Menu items — try LLM generation first, fall back to SQLite matching
   let menuResult = null
 
   if (intent) {
     // 3a. Ask LLM to generate menus for the discovered restaurants
-    menuResult = await measureStage(metrics, 'menuGenerationMs', () =>
-      generateMenuItems(geoResult.restaurants, intent, 6, metrics),
-    )
+    menuResult = await generateMenuItems(geoResult.restaurants, intent)
   }
 
   if (!menuResult) {
     // 3b. Fallback: keyword match against local SQLite menu
     const fallback = intent
-      ? await measureStage(metrics, 'sqliteFallbackMs', () => matchMenuItems(intent, 6, metrics))
+      ? matchMenuItems(intent)
       : { items: [], markers: [], cached: false }
     menuResult = { ...fallback, source: 'fallback' }
   }
