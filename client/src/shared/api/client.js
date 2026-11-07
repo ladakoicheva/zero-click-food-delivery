@@ -1,5 +1,8 @@
 async function request(url, options) {
   const response = await fetch(url, options)
+  if (!response.headers.get('content-type')?.includes('application/json')) {
+    throw new Error('The server returned an unexpected response. Check that the backend is running and up to date.')
+  }
   const data = await response.json()
   if (!response.ok) throw new Error(data.error || 'Request failed.')
   return data

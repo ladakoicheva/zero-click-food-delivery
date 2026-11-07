@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { defaultMenuItems } from '../../entities/restaurant/model'
 import { fetchFeed } from '../../shared/api/client'
 
 const POLL_INTERVAL_MS = 30_000 // 30 seconds
 
 /**
- * usePollFeed — polls GET /api/restaurants/feed every 30 s.
+ * useStartupMenu — polls GET /api/restaurants/feed every 30 s.
  *
  * - Uses ETag / 304 so repeat polls with no data change are near-zero cost.
  * - Only triggers a re-render when the server returns new data.
@@ -13,7 +14,7 @@ const POLL_INTERVAL_MS = 30_000 // 30 seconds
  *
  * @returns {{ items: MenuItem[], updatedAt: string|null, loading: boolean, error: string|null }}
  */
-export function usePollFeed() {
+export function useStartupMenu() {
   const [items, setItems] = useState([])
   const [updatedAt, setUpdatedAt] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -64,5 +65,5 @@ export function usePollFeed() {
     }
   }, [poll])
 
-  return { items, updatedAt, loading, error }
+  return { items: items.length ? items : defaultMenuItems, updatedAt, loading, error }
 }

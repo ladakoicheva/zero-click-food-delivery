@@ -3,6 +3,7 @@ import { after, before, test } from 'node:test'
 import { createApp } from '../src/index.js'
 import { getOrderStatus } from '../src/modules/orders/helpers.js'
 import { TtlCache } from '../src/shared/cache/ttlCache.js'
+import { createFeedEtag } from '../src/modules/restaurants/feedController.js'
 
 const app = createApp()
 let server
@@ -33,6 +34,23 @@ test('suggestions require a useful query', async () => {
 
   assert.equal(response.status, 400)
   assert.match((await response.json()).error, /at least two characters/)
+})
+
+test('feed ETag reflects image and content changes even when item IDs are unchanged', () => {
+  const items = [{ id: 'first', image: 'old' }, { id: 'middle', image: 'old' }, { id: 'last', image: 'old' }]
+  const updated = items.map((item) => item.id === 'middle' ? { ...item, image: 'new' } : item)
+  assert.equal(createFeedEtag(items), createFeedEtag(items))
+  assert.notEqual(createFeedEtag(items), createFeedEtag(updated))
+})
+
+test('feed returns 304 for an unchanged ETag', async () => {
+  const first = await fetch(`${baseUrl}/api/restaurants/feed`)
+  assert.equal(first.status, 200)
+  const etag = first.headers.get('etag')
+  assert.ok(etag)
+  const second = await fetch(`${baseUrl}/api/restaurants/feed`, { headers: { 'If-None-Match': etag } })
+  assert.equal(second.status, 304)
+  assert.equal(second.headers.get('etag'), etag)
 })
 
 test('orders can be created and tracked without processing payment', async () => {

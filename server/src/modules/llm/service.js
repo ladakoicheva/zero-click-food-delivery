@@ -17,6 +17,7 @@
  */
 
 import { TtlCache } from '../../shared/cache/ttlCache.js'
+import { foodTerms } from '../../shared/foodDictionary.js'
 import { SingleFlight } from '../../shared/cache/singleFlight.js'
 import {
   countCache,
@@ -102,9 +103,10 @@ function regexNormalize(raw) {
     'burger', 'pizza', 'pasta', 'sushi', 'ramen', 'curry', 'soup', 'salad',
     'bowl', 'sandwich', 'wrap', 'steak', 'chicken', 'fish', 'seafood', 'tacos',
   ]
-  const category = categories.find((c) => lower.includes(c)) ?? 'food'
+  const category = categories.find((c) => lower.includes(c)) ?? foodTerms(raw)[0] ?? 'food'
 
-  return { cleanQuery: clean, category, dietary: dietaryTags, maxBudget, speedPriority }
+  const translatedTerms = foodTerms(raw).join(' ')
+  return { cleanQuery: [clean, translatedTerms].filter(Boolean).join(' '), category, dietary: dietaryTags, maxBudget, speedPriority }
 }
 
 // ─── Shared JSON chat completion helper ──────────────────────────────────────
