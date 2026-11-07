@@ -11,6 +11,8 @@ import { useOrderPrompt } from '../features/order-by-prompt/useOrderPrompt'
 import { usePollFeed } from '../features/order-by-prompt/usePollFeed'
 import { OrderStatus } from '../features/order-status/OrderStatus'
 import { useOrderTracking } from '../features/order-status/useOrderTracking'
+import { NearbyRestaurants } from '../features/nearby-restaurants/NearbyRestaurants'
+import { Account } from '../features/auth/Account'
 import '../App.css'
 
 export function HomePage() {
@@ -27,7 +29,7 @@ export function HomePage() {
 
   // Use backend/LLM results after search; feed is shown before the first search.
   const feedItems = feed.items.length ? feed.items : defaultMenuItems
-  const items = prompt.status === 'succeeded' ? prompt.suggestions : feedItems
+  const items = prompt.status === 'idle' ? feedItems : prompt.suggestions
 
   async function submitOrder(event) {
     event.preventDefault()
@@ -35,5 +37,5 @@ export function HomePage() {
     if (submitOrderThunk.fulfilled.match(result)) setCheckoutOpen(false)
   }
 
-  return <div className="min-h-screen bg-[#f7f6f2] text-[#20251f]"><header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8"><a className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight" href="/" aria-label="Spoon, home"><span className="brand-mark">S</span>spoon</a><div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-[#626960] shadow-sm"><span aria-hidden="true">⌖</span><span>Moscow</span><span className="hidden text-[#a2a69f] sm:inline">·</span><span className="hidden sm:inline">Delivery 25–40 min</span></div></header><main className="mx-auto w-full max-w-7xl px-5 pb-20 sm:px-8"><PromptHero query={prompt.query} loading={prompt.loading} onQueryChange={prompt.setQuery} onSubmit={prompt.submitPrompt} /><div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]"><FoodGrid error={prompt.error} items={items} selectedItem={selectedItem} onSelect={(item) => dispatch(selectItem(item))} /><aside className="lg:sticky lg:top-6">{order ? <OrderStatus order={order} trackingError={trackingError} /> : <OrderSummary item={selectedItem} onCheckout={() => setCheckoutOpen(true)} />}</aside></div><footer className="mt-16 border-t border-[#e5e7e1] pt-5 text-center text-xs text-[#92978f]">spoon · Food delivery demo · Checkout and courier tracking are simulated</footer></main>{checkoutOpen && selectedItem && <CheckoutModal error={orderError} form={form} item={selectedItem} placing={placing} setForm={(nextForm) => dispatch(updateProfile(nextForm))} onClose={() => setCheckoutOpen(false)} onSubmit={submitOrder} />}</div>
+  return <div className="min-h-screen bg-[#f7f6f2] text-[#20251f]"><header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8"><a className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight" href="/" aria-label="Spoon, home"><span className="brand-mark">S</span>spoon</a><div className="flex items-center gap-2"><div className="flex items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-[#626960] shadow-sm"><span aria-hidden="true">⌖</span><span>Kyiv</span><span className="hidden text-[#a2a69f] sm:inline">·</span><span className="hidden sm:inline">Delivery 25–40 min</span></div><Account /></div></header><main className="mx-auto w-full max-w-7xl px-5 pb-20 sm:px-8"><PromptHero query={prompt.query} loading={prompt.loading} onQueryChange={prompt.setQuery} onSubmit={prompt.submitPrompt} /><div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]"><FoodGrid error={prompt.error} items={items} selectedItem={selectedItem} onSelect={(item) => dispatch(selectItem(item))} /><aside className="lg:sticky lg:top-6">{order ? <OrderStatus order={order} trackingError={trackingError} /> : <OrderSummary item={selectedItem} onCheckout={() => setCheckoutOpen(true)} />}</aside></div><NearbyRestaurants /><footer className="mt-16 border-t border-[#e5e7e1] pt-5 text-center text-xs text-[#92978f]">spoon · Food delivery demo · Checkout and courier tracking are simulated</footer></main>{checkoutOpen && selectedItem && <CheckoutModal error={orderError} form={form} item={selectedItem} placing={placing} setForm={(nextForm) => dispatch(updateProfile(nextForm))} onClose={() => setCheckoutOpen(false)} onSubmit={submitOrder} />}</div>
 }

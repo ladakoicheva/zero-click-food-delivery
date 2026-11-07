@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
 import { createOrder, getOrder } from '../../shared/api/client'
+import { searchSuggestions } from '../../features/order-by-prompt/promptSlice'
 
 export const submitOrder = createAsyncThunk('order/submit', createOrder)
 export const refreshOrder = createAsyncThunk('order/refresh', getOrder)
@@ -25,6 +26,9 @@ const orderSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(searchSuggestions.fulfilled, (state, action) => {
+        if (action.payload.items.length === 0) state.selectedItem = null
+      })
       .addCase(submitOrder.pending, (state) => {
         state.status = 'placing'
         state.error = ''

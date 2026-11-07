@@ -3,6 +3,7 @@ import { generateMenuItems } from './menuGenerator.js'
 import { normalizeQuery } from '../llm/service.js'
 import { saveGeneratedMenuItems } from '../../database/database.js'
 import { measureStage, startPerfTrace } from '../../shared/performanceMetrics.js'
+import { foodTerms } from '../../shared/foodDictionary.js'
 
 /**
  * GET /api/restaurants?lat=50.45&lng=30.52&q=spicy+chicken
@@ -29,6 +30,10 @@ export async function getRestaurantsAndMenu(request, response) {
   const lat = Number.parseFloat(request.query.lat)
   const lng = Number.parseFloat(request.query.lng)
   const rawQuery = typeof request.query.q === 'string' ? request.query.q.trim() : ''
+
+  if (rawQuery && foodTerms(rawQuery).length === 0) {
+    return response.json({ restaurants: [], items: [], markers: [], intent: null, menuSource: null, source: null, cached: false })
+  }
 
   const searchLat = Number.isFinite(lat) ? lat : undefined
   const searchLng = Number.isFinite(lng) ? lng : undefined
