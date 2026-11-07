@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { locationErrorMessage, requestLocation } from './geolocation'
 
 export function NearbyRestaurants() {
   const [location, setLocation] = useState(null)
@@ -6,24 +7,15 @@ export function NearbyRestaurants() {
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    let active = true
-
     if (!navigator.geolocation) return
 
-    navigator.geolocation.getCurrentPosition(
+    return requestLocation(
+      navigator.geolocation,
       ({ coords }) => {
-        if (active) setLocation({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy })
+        setLocation({ lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy })
       },
-      (err) => {
-        if (!active) return
-        setError(err.code === 1
-          ? 'Location access was denied. Allow it in your browser settings to see nearby restaurants.'
-          : 'Could not determine your location. Please try again.')
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+      (error) => setError(locationErrorMessage(error)),
     )
-
-    return () => { active = false }
   }, [attempt])
 
   function retry() {

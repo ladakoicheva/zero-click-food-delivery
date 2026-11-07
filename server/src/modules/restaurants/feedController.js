@@ -1,4 +1,10 @@
+import { createHash } from 'node:crypto'
 import { listAvailableMenuItems } from '../../database/database.js'
+
+export function createFeedEtag(items) {
+  const digest = createHash('sha256').update(JSON.stringify(items)).digest('base64url')
+  return `"${digest}"`
+}
 
 /**
  * GET /api/feed
@@ -28,15 +34,14 @@ export function getFeed(_request, response) {
     keywords: item.keywords,
   }))
 
-  // Build a simple ETag from item count + first+last id (cheap, no hashing dep)
-  const etag = `"${items.length}-${items[0]?.id ?? 'empty'}-${items.at(-1)?.id ?? 'empty'}"`
+  const etag = createFeedEtag(items)
+
+  response.setHeader('ETag', etag)
+  response.setHeader('Cache-Control', 'no-cache')
 
   if (_request.headers['if-none-match'] === etag) {
     return response.status(304).end()
   }
-
-  response.setHeader('ETag', etag)
-  response.setHeader('Cache-Control', 'no-cache')
 
   return response.json({
     items,

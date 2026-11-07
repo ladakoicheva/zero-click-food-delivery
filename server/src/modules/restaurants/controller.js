@@ -1,7 +1,7 @@
 import { searchRestaurants, matchMenuItems } from './service.js'
 import { generateMenuItems } from './menuGenerator.js'
 import { normalizeQuery } from '../llm/service.js'
-import { saveGeneratedMenuItems } from '../../database/database.js'
+import { registerGeneratedItems } from './runtimeMenu.js'
 import { foodTerms } from '../../shared/foodDictionary.js'
 import { measureStage, startPerfTrace } from '../../shared/performanceMetrics.js'
 
@@ -68,7 +68,7 @@ export async function getRestaurantsAndMenu(request, response) {
   }
 
   if (menuResult.source === 'llm') {
-    saveGeneratedMenuItems(menuResult.items)
+    menuResult.items = registerGeneratedItems(menuResult.items)
   }
 
   return response.json({

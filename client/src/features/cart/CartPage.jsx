@@ -1,3 +1,5 @@
+import { CartIcon } from './CartIcon'
+
 export function CartPage({ items, selectedItem, onBack, onRemove, onSelect, onCheckout }) {
   const total = items.reduce((sum, item) => sum + Number(item.price || 0), 0)
 
@@ -11,7 +13,7 @@ export function CartPage({ items, selectedItem, onBack, onRemove, onSelect, onCh
         <h1 className="mt-1 font-display text-4xl font-semibold tracking-tight">Shopping cart</h1>
         {!items.length ? (
           <div className="mt-8 rounded-3xl border border-[#e5e9e1] bg-white px-6 py-16 text-center shadow-sm">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#eef2eb] text-3xl" aria-hidden="true">🛒</div>
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#eef2eb] text-[#456b49]"><CartIcon className="h-8 w-8" /></div>
             <h2 className="mt-5 font-display text-2xl font-semibold">Your cart is waiting</h2>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#777e74]">Pick something delicious from the menu and it will appear here.</p>
             <button className="primary-button mt-6 rounded-xl px-5 py-3 text-sm font-semibold text-white hover:bg-[#38593c]" onClick={onBack} type="button">Explore the menu</button>

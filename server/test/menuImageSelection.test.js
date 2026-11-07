@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { generateMenuItems } from '../src/modules/restaurants/menuGenerator.js'
+import { menu } from '../data-mock/menu.js'
 
 async function generateMockedMenu({ dishName, category, caseName }) {
   const originalFetch = globalThis.fetch
@@ -91,4 +92,52 @@ test('default image is used when neither dish name nor category matches', async 
   })
 
   assert.equal(image, 'photo-1504674900247-0877df9cc836')
+})
+
+test('kebab image is consistent in generated and seeded menus', async () => {
+  const image = await generateMockedMenu({
+    dishName: 'Lamb Kebab Platter',
+    category: 'kebab',
+    caseName: `menu-image-kebab-${Date.now()}-${Math.random()}`,
+  })
+
+  assert.equal(image, 'photo-1504674900247-0877df9cc836')
+  assert.equal(menu.find((item) => item.id === 'lamb-kebab')?.image, image)
+})
+
+test('pizza photos vary across restaurants and remain stable on cache hits', async () => {
+  const originalFetch = globalThis.fetch
+  const originalGroqKey = process.env.GROQ_API_KEY
+  let fetchCalls = 0
+  process.env.GROQ_API_KEY = 'menu-image-regression-test-only'
+  globalThis.fetch = async () => {
+    fetchCalls++
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({
+          items: ['Margherita Pizza', 'Cheese Pizza', 'Mushroom Pizza'].map((name) => ({
+            name, price: 15, prepTime: 20,
+          })),
+        }) } }],
+      }),
+    }
+  }
+  try {
+    const restaurants = [
+      { id: 'photo-pizza-one', name: 'Photo Pizza One', lat: 50.45, lng: 30.52 },
+      { id: 'photo-pizza-two', name: 'Photo Pizza Two', lat: 50.46, lng: 30.53 },
+    ]
+    const intent = { cleanQuery: 'photo variety pizza', category: 'pizza', dietary: [], maxBudget: null }
+    const first = await generateMenuItems(restaurants, intent)
+    const repeated = await generateMenuItems(restaurants, intent)
+    assert.equal(fetchCalls, 2)
+    assert.equal(first.items.length, 6)
+    assert.equal(new Set(first.items.slice(0, 4).map((item) => item.image)).size, 4)
+    assert.deepEqual(repeated.items.map((item) => item.image), first.items.map((item) => item.image))
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalGroqKey === undefined) delete process.env.GROQ_API_KEY
+    else process.env.GROQ_API_KEY = originalGroqKey
+  }
 })
