@@ -39,20 +39,20 @@ const CATEGORY_PHOTOS = {
   burger:     ['photo-1568901346375-23c9450c58cd', 'photo-1565299507177-b0ac66763828', 'photo-1550547660-d9450f859349'],
   pizza:      ['photo-1513104890138-7c749659a591', 'photo-1565299624946-b28f40a0ae38', 'photo-1574071318508-1cdbab80d002', 'photo-1593560708920-61dd98c46a4e'],
   pasta:      ['photo-1473093295043-cdd812d0e601', 'photo-1621996346565-e3dbc646d9a9', 'photo-1551183053-bf91a1d81141'],
-  sushi:      ['photo-1579871494447-9811cf80d66c', 'photo-1553621042-f6e147245754'],
-  ramen:      'photo-1569718212165-3a8278d5f624',
-  curry:      'photo-1603894584373-5ac82b2ae398',
-  soup:       'photo-1547592180-85f173990554',
-  salad:      ['photo-1512621776951-a57141f2eefd', 'photo-1546069901-ba9599a7e63c'],
-  bowl:       'photo-1512621776951-a57141f2eefd',
-  steak:      'photo-1546964124-0cce460f38ef',
-  chicken:    'photo-1606755962773-d324e0a13086',
-  fish:       'photo-1467003909585-2f8a72700288',
-  seafood:    'photo-1563379926898-05f4575a45d8',
-  sandwich:   'photo-1509722747041-616f39b57569',
-  wrap:       'photo-1626700051175-6818013e1d4f',
-  kebab:      'photo-1504674900247-0877df9cc836',
-  default:    'photo-1504674900247-0877df9cc836',
+  sushi:      ['photo-1579871494447-9811cf80d66c', 'photo-1553621042-f6e147245754', 'photo-1579584425555-c3ce17fd4351'],
+  ramen:      ['photo-1569718212165-3a8278d5f624', 'photo-1612927601601-6638404737ce', 'photo-1623341214825-9f4f963727da'],
+  curry:      ['photo-1603894584373-5ac82b2ae398', 'photo-1708782344490-9026aaa5eec7', 'photo-1585937421612-70a008356fbe'],
+  soup:       ['photo-1547592180-85f173990554', 'photo-1476718406336-bb5a9690ee2a', 'photo-1547592166-23ac45744acd'],
+  salad:      ['photo-1512621776951-a57141f2eefd', 'photo-1546069901-ba9599a7e63c', 'photo-1607532941433-304659e8198a'],
+  bowl:       ['photo-1512621776951-a57141f2eefd', 'photo-1546069901-ba9599a7e63c', 'photo-1511690656952-34342bb7c2f2'],
+  steak:      ['photo-1546964124-0cce460f38ef', 'photo-1588168333986-5078d3ae3976', 'photo-1600891964092-4316c288032e'],
+  chicken:    ['photo-1606755962773-d324e0a13086', 'photo-1606728035253-49e8a23146de', 'photo-1602534923950-d2c7e6be0ca0'],
+  fish:       ['photo-1467003909585-2f8a72700288', 'photo-1510130387422-82bed34b37e9', 'photo-1519708227418-c8fd9a32b7a2'],
+  seafood:    ['photo-1563379926898-05f4575a45d8', 'photo-1559737558-2f5a35f4523b', 'photo-1579783411296-c908953b2dcd'],
+  sandwich:   ['photo-1509722747041-616f39b57569', 'photo-1553909489-cd47e0907980', 'photo-1528735602780-2552fd46c7af'],
+  wrap:       ['photo-1626700051175-6818013e1d4f', 'photo-1646530208887-8a791bff4701', 'photo-1562059390-a761a084768e'],
+  kebab:      ['photo-1504674900247-0877df9cc836', 'photo-1555939594-58d7cb561ad1', 'photo-1603360946369-dc9bb6258143'],
+  default:    ['photo-1504674900247-0877df9cc836', 'photo-1546069901-ba9599a7e63c', 'photo-1600891964092-4316c288032e'],
 }
 
 // Prefer dish formats over their fillings (for example, "chicken wrap" should
@@ -264,7 +264,7 @@ export async function generateMenuItems(restaurants, intent, limit = 6, metrics 
     const photos = CATEGORY_PHOTOS[key]
     const index = photoIndexes.get(key) ?? 0
     photoIndexes.set(key, index + 1)
-    return { ...item, image: Array.isArray(photos) ? photos[index % photos.length] : photos }
+    return { ...item, image: photos[index % photos.length] }
   })
 
   // Deduplicated map markers
