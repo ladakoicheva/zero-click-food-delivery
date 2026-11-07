@@ -29,12 +29,13 @@ const promptSlice = createSlice({
       .addCase(searchSuggestions.pending, (state) => {
         state.status = 'loading'
         state.error = ''
+        state.suggestions = []
       })
       .addCase(searchSuggestions.fulfilled, (state, action) => {
         state.status = 'succeeded'
         state.suggestions = action.payload.items
         if (action.payload.items.length === 0) {
-          state.error = 'No exact matches yet. Try describing what you’re craving another way.'
+          state.error = 'No match.'
         }
       })
       .addCase(searchSuggestions.rejected, (state, action) => {
