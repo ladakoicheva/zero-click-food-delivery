@@ -1,7 +1,6 @@
 import { useDispatch, useSelector } from 'react-redux'
 import { searchSuggestions, setPromptError, setQuery } from './promptSlice'
-
-const DEMO_LOCATION = { lat: 50.4501, lng: 30.5234 }
+import { DEMO_LOCATION } from '../../shared/lib/demoLocation'
 
 export function useOrderPrompt() {
   const dispatch = useDispatch()
