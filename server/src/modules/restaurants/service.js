@@ -22,7 +22,14 @@
  */
 
 import { TtlCache } from '../../shared/cache/ttlCache.js'
+import { SingleFlight } from '../../shared/cache/singleFlight.js'
 import { listAvailableMenuItems } from '../../database/database.js'
+import {
+  countCache,
+  measureProvider,
+  recordSingleFlight,
+  startTiming,
+} from '../../shared/performanceMetrics.js'
 
 // ─── Kyiv Oblast rough bounding box ──────────────────────────────────────────
 const KYIV_OBLAST = {
@@ -37,11 +44,15 @@ const FSQ_FOOD_CATEGORY = '13000'
 // ─── Caches ──────────────────────────────────────────────────────────────────
 const geoCache = new TtlCache(5 * 60_000)   // 5-minute geo results
 const menuCache = new TtlCache(60_000)        // 1-minute matched-menu results
+const restaurantSearchSingleFlight = new SingleFlight()
 
 // ─── Foursquare Places Search ─────────────────────────────────────────────────
-async function fetchFoursquarePlaces(lat, lng, query = 'restaurant') {
+async function fetchFoursquarePlaces(lat, lng, query = 'restaurant', metrics = null) {
   const apiKey = process.env.FOURSQUARE_API_KEY
-  if (!apiKey) return null
+  if (!apiKey) {
+    if (metrics) await measureProvider(metrics, 'foursquare', false, async () => null)
+    return null
+  }
 
   const url = new URL('https://api.foursquare.com/v3/places/search')
   url.searchParams.set('ll', `${lat},${lng}`)
@@ -52,25 +63,27 @@ async function fetchFoursquarePlaces(lat, lng, query = 'restaurant') {
   url.searchParams.set('limit', '20')
   url.searchParams.set('fields', 'fsq_id,name,geocodes,location,rating,hours')
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 4_000)
+  return measureProvider(metrics, 'foursquare', true, async () => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 4_000)
 
-  try {
-    const res = await fetch(url.toString(), {
-      signal: controller.signal,
-      headers: {
-        Authorization: apiKey,
-        Accept: 'application/json',
-      },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.results ?? []
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timeout)
-  }
+    try {
+      const res = await fetch(url.toString(), {
+        signal: controller.signal,
+        headers: {
+          Authorization: apiKey,
+          Accept: 'application/json',
+        },
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      return data.results ?? []
+    } catch {
+      return null
+    } finally {
+      clearTimeout(timeout)
+    }
+  })
 }
 
 // ─── Transform a Foursquare result to our internal restaurant shape ───────────
@@ -117,30 +130,49 @@ function getSqliteRestaurants() {
  *   lat/lng default to Kyiv city centre when omitted.
  * @returns {Promise<{ restaurants: Restaurant[], source: 'google'|'local' }>}
  */
-export async function searchRestaurants({ lat, lng, keyword } = {}) {
+export async function searchRestaurants({ lat, lng, keyword } = {}, metrics = null) {
   const searchLat = typeof lat === 'number' ? lat : KYIV_OBLAST.centerLat
   const searchLng = typeof lng === 'number' ? lng : KYIV_OBLAST.centerLng
   const searchKeyword = keyword || 'restaurant'
 
   const cacheKey = `${searchLat.toFixed(3)},${searchLng.toFixed(3)},${searchKeyword}`
   const cached = geoCache.get(cacheKey)
+  countCache(metrics, 'geoSearch', Boolean(cached))
   if (cached) return { ...cached, cached: true }
 
-  const places = await fetchFoursquarePlaces(searchLat, searchLng, searchKeyword)
+  const startedAt = metrics ? startTiming(metrics) : null
+  const flight = restaurantSearchSingleFlight.runWithStatus(cacheKey, async () => {
+    const places = await fetchFoursquarePlaces(searchLat, searchLng, searchKeyword, metrics)
 
-  if (places !== null) {
-    const restaurants = places.map(placeToRestaurant)
+    if (places !== null) {
+      const restaurants = places.map(placeToRestaurant)
 
-    const result = { restaurants, source: 'foursquare', cached: false }
+      const result = { restaurants, source: 'foursquare', cached: false }
+      geoCache.set(cacheKey, result)
+      return result
+    }
+
+    // ── Fallback: local SQLite ────────────────────────────────────────────────
+    const restaurants = getSqliteRestaurants()
+    const result = { restaurants, source: 'local', cached: false }
     geoCache.set(cacheKey, result)
     return result
-  }
+  })
 
-  // ── Fallback: local SQLite ────────────────────────────────────────────────
-  const restaurants = getSqliteRestaurants()
-  const result = { restaurants, source: 'local', cached: false }
-  geoCache.set(cacheKey, result)
-  return result
+  let outcome = 'failure'
+  try {
+    const result = await flight.promise
+    outcome = result.source === 'local' ? 'fallback' : 'success'
+    return result
+  } finally {
+    recordSingleFlight(
+      metrics,
+      'restaurant_search',
+      flight.joined ? 'joined' : 'started',
+      startedAt,
+      outcome,
+    )
+  }
 }
 
 // ─── Menu item matching ───────────────────────────────────────────────────────
@@ -153,11 +185,12 @@ export async function searchRestaurants({ lat, lng, keyword } = {}) {
  * @param {number} [limit=6]
  * @returns {{ items: MatchedItem[], markers: MapMarker[] }}
  */
-export function matchMenuItems(intent, limit = 6) {
+export function matchMenuItems(intent, limit = 6, metrics = null) {
   const { cleanQuery = '', category = '', dietary = [], maxBudget = null } = intent
 
-  const cacheKey = `${cleanQuery}|${category}|${dietary.join(',')}|${maxBudget}`
+  const cacheKey = JSON.stringify([cleanQuery, category, dietary, maxBudget, limit])
   const cached = menuCache.get(cacheKey)
+  countCache(metrics, 'matchedMenu', Boolean(cached))
   if (cached) return { ...cached, cached: true }
 
   // Build a restaurant → coord map from SQLite (always available)
