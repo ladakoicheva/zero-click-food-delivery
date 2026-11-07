@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import {
-  getAuth, getMultiFactorResolver, isSignInWithEmailLink, multiFactor,
-  sendSignInLinkToEmail, signInWithEmailLink, signOut, TotpMultiFactorGenerator,
+  getAuth, isSignInWithEmailLink, sendSignInLinkToEmail, signInWithEmailLink, signOut,
 } from 'firebase/auth'
 import { createAuthFlows } from './flows'
 
@@ -14,8 +13,7 @@ const config = {
 
 export const auth = Object.values(config).every(Boolean) ? getAuth(initializeApp(config)) : null
 export const emailStorageKey = 'spoon-email-for-sign-in'
-export const { completeLink, beginEnrollment, finishEnrollment, completeSecondFactor, hasTotp } =
-  createAuthFlows({ getMultiFactorResolver, multiFactor, signInWithEmailLink, TotpMultiFactorGenerator }, auth)
+export const { completeLink } = createAuthFlows({ signInWithEmailLink }, auth)
 
 export function isEmailLink(url) {
   return auth ? isSignInWithEmailLink(auth, url) : false
