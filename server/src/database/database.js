@@ -2,6 +2,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
+import { menu } from '../../data-mock/menu.js'
+
+const baseMenuIds = new Set(menu.map((item) => item.id))
 
 const databaseDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data')
 const databasePath = process.env.DATABASE_PATH || path.join(databaseDirectory, 'food-delivery.sqlite')
@@ -104,70 +107,6 @@ export function seedDatabase(menu) {
   }
 }
 
-export function saveGeneratedMenuItems(items) {
-  const upsertRestaurant = database.prepare(`
-    INSERT INTO restaurants (name, rating, is_open, address, lat, lng)
-    VALUES (?, ?, 1, ?, ?, ?)
-    ON CONFLICT(name) DO UPDATE SET
-      rating = excluded.rating,
-      is_open = 1,
-      lat = excluded.lat,
-      lng = excluded.lng
-  `)
-  const findRestaurant = database.prepare('SELECT id FROM restaurants WHERE name = ?')
-  const upsertMenuItem = database.prepare(`
-    INSERT INTO menu_items (
-      id, restaurant_id, title, description, price, prep_time_minutes,
-      rating, image, tag, keywords, is_available
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-    ON CONFLICT(id) DO UPDATE SET
-      restaurant_id = excluded.restaurant_id,
-      title = excluded.title,
-      description = excluded.description,
-      price = excluded.price,
-      prep_time_minutes = excluded.prep_time_minutes,
-      rating = excluded.rating,
-      image = excluded.image,
-      tag = excluded.tag,
-      is_available = 1
-  `)
-
-  database.exec('BEGIN')
-  try {
-    for (const item of items) {
-      const prepTimeMinutes = Number.parseInt(item.time, 10)
-      if (!item.id || !item.name || !item.restaurant || !Number.isInteger(prepTimeMinutes) || prepTimeMinutes <= 0) {
-        throw new Error('Generated menu item is missing required fields.')
-      }
-
-      upsertRestaurant.run(
-        item.restaurant,
-        Number(item.rating) || 0,
-        'Kyiv, Ukraine',
-        item.lat ?? 50.4501,
-        item.lng ?? 30.5234,
-      )
-      const restaurant = findRestaurant.get(item.restaurant)
-      upsertMenuItem.run(
-        item.id,
-        restaurant.id,
-        item.name,
-        item.description ?? '',
-        Number(item.price) || 0,
-        prepTimeMinutes,
-        Number(item.rating) || 0,
-        item.image ?? null,
-        item.tag ?? null,
-        JSON.stringify(item.dietary ?? []),
-      )
-    }
-    database.exec('COMMIT')
-  } catch (error) {
-    database.exec('ROLLBACK')
-    throw error
-  }
-}
-
 export function listAvailableMenuItems() {
   const rows = database.prepare(`
     SELECT menu_items.id, menu_items.title AS name, restaurants.name AS restaurant,
@@ -181,7 +120,7 @@ export function listAvailableMenuItems() {
     ORDER BY menu_items.id
   `).all()
 
-  return rows.map((item) => ({
+  return rows.filter((item) => baseMenuIds.has(item.id)).map((item) => ({
     ...item,
     rating: String(item.rating),
     time: `${item.prep_time_minutes}–${item.prep_time_minutes + 10} min`,
@@ -190,6 +129,7 @@ export function listAvailableMenuItems() {
 }
 
 export function findMenuItem(id) {
+  if (!baseMenuIds.has(id)) return undefined
   return database.prepare(`
     SELECT menu_items.id, menu_items.title AS name, restaurants.name AS restaurant,
       restaurants.id AS restaurant_id, menu_items.price

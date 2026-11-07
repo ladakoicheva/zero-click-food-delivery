@@ -36,14 +36,14 @@ const menuGenerationSingleFlight = new SingleFlight()
 
 // Unsplash photo IDs mapped to food categories — used for realistic images
 const CATEGORY_PHOTOS = {
-  burger:     'photo-1568901346375-23c9450c58cd',
-  pizza:      'photo-1513104890138-7c749659a591',
-  pasta:      'photo-1473093295043-cdd812d0e601',
-  sushi:      'photo-1579871494447-9811cf80d66c',
+  burger:     ['photo-1568901346375-23c9450c58cd', 'photo-1565299507177-b0ac66763828', 'photo-1550547660-d9450f859349'],
+  pizza:      ['photo-1513104890138-7c749659a591', 'photo-1565299624946-b28f40a0ae38', 'photo-1574071318508-1cdbab80d002', 'photo-1593560708920-61dd98c46a4e'],
+  pasta:      ['photo-1473093295043-cdd812d0e601', 'photo-1621996346565-e3dbc646d9a9', 'photo-1551183053-bf91a1d81141'],
+  sushi:      ['photo-1579871494447-9811cf80d66c', 'photo-1553621042-f6e147245754'],
   ramen:      'photo-1569718212165-3a8278d5f624',
   curry:      'photo-1603894584373-5ac82b2ae398',
   soup:       'photo-1547592180-85f173990554',
-  salad:      'photo-1512621776951-a57141f2eefd',
+  salad:      ['photo-1512621776951-a57141f2eefd', 'photo-1546069901-ba9599a7e63c'],
   bowl:       'photo-1512621776951-a57141f2eefd',
   steak:      'photo-1546964124-0cce460f38ef',
   chicken:    'photo-1606755962773-d324e0a13086',
@@ -51,7 +51,7 @@ const CATEGORY_PHOTOS = {
   seafood:    'photo-1563379926898-05f4575a45d8',
   sandwich:   'photo-1509722747041-616f39b57569',
   wrap:       'photo-1626700051175-6818013e1d4f',
-  kebab:      'photo-1599487488310-9efea7ff0bb4',
+  kebab:      'photo-1504674900247-0877df9cc836',
   default:    'photo-1504674900247-0877df9cc836',
 }
 
@@ -62,11 +62,10 @@ const PHOTO_KEYWORD_PRIORITY = [
   'bowl', 'sandwich', 'wrap', 'kebab', 'steak', 'chicken', 'fish', 'seafood',
 ]
 
-/** Return a mapped photo for a dish name or category, without applying default. */
+/** Return the photo category for a dish name or category, without applying default. */
 function photoKeyForName(text = '') {
   const lower = text.toLowerCase()
-  const keyword = PHOTO_KEYWORD_PRIORITY.find((key) => lower.includes(key))
-  return keyword ? CATEGORY_PHOTOS[keyword] ?? null : null
+  return PHOTO_KEYWORD_PRIORITY.find((key) => lower.includes(key)) ?? null
 }
 
 // ─── Groq LLM call ────────────────────────────────────────────────────────────
@@ -135,7 +134,6 @@ Return a JSON object with key "items" containing an array of exactly 3 objects, 
       price: Number(item.price) || 12,
       rating: String(item.rating ?? '4.5'),
       time: `${item.prepTime ?? 20}–${(item.prepTime ?? 20) + 10} min`,
-      image: photoKeyForName(item.name) ?? photoKeyForName(category) ?? CATEGORY_PHOTOS.default,
       tag: item.tag ?? 'Popular',
       dietary: item.dietary ?? [],
       lat: restaurant.lat,
@@ -260,16 +258,25 @@ export async function generateMenuItems(restaurants, intent, limit = 6, metrics 
 
   if (allItems.length === 0) return null  // signal caller to use fallback
 
+  const photoIndexes = new Map()
+  const itemsWithPhotos = allItems.map((item) => {
+    const key = photoKeyForName(item.name) ?? photoKeyForName(category) ?? 'default'
+    const photos = CATEGORY_PHOTOS[key]
+    const index = photoIndexes.get(key) ?? 0
+    photoIndexes.set(key, index + 1)
+    return { ...item, image: Array.isArray(photos) ? photos[index % photos.length] : photos }
+  })
+
   // Deduplicated map markers
   const markerMap = new Map()
-  allItems.forEach((item) => {
+  itemsWithPhotos.forEach((item) => {
     if (!markerMap.has(item.restaurant)) {
       markerMap.set(item.restaurant, { name: item.restaurant, lat: item.lat, lng: item.lng })
     }
   })
 
   return {
-    items: allItems,
+    items: itemsWithPhotos,
     markers: [...markerMap.values()],
     source: 'llm',
   }

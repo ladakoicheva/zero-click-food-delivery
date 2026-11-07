@@ -35,12 +35,17 @@ This is a demo identity UI, not authorization for the ordering API: existing ord
 
 The map asks the browser for the user's location and sends its coordinates to Google Maps in an iframe search for restaurants. Geolocation requires permission and HTTPS or localhost; the reported accuracy is an estimate. This uses no Google Places API key or backend restaurant search.
 
+If precise location is unavailable or times out, the app retries with approximate location and may use a recent cached position. Location services and network access may still be necessary even when browser permission is granted; failures can be retried.
+
 Google controls the map search results and iframe availability. The iframe does not expose restaurant coordinates to the app, so there is no graph search or guarantee that the closest restaurant is selected. The map does not establish Glovo participation, menu contents, or delivery availability. The existing menu and checkout remain a separate demo.
 
 ## Demo behavior
 
+- The startup menu is shown initially and immediately when the search field is cleared. Search runs when the form is submitted; clearing the field ignores any pending search response.
 - Dish searches accept terms in a limited food dictionary (English, Ukrainian and Russian). Unrecognized queries return no match. The existing restaurant search can still generate demo dishes for recognized requests.
-- Orders are stored in server memory and disappear when the server restarts.
+- The startup menu contains only dishes from `server/data-mock/menu.js`. Older generated dishes remain in the database but are hidden from the menu and cannot be ordered.
+- Generated search dishes and their orders are kept in server memory and disappear when the server restarts. Orders for startup-menu dishes are stored in SQLite.
+- Generated food images rotate through finite category-specific photo pools; categories without multiple photos may repeat.
 - Payment methods are for demonstration only. Card details are never requested and no money is charged.
 - Tracking numbers and courier status updates are simulated; this is not a real delivery service.
 - Menu prices are displayed in US dollars.

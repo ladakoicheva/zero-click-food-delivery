@@ -104,7 +104,7 @@ export const menu = [
     lat: 50.5008, lng: 30.4983,
     description: 'Grilled lamb skewers, flatbread, tzatziki',
     price: 19.9, rating: '4.7', time: '35',
-    image: 'photo-1599487488310-9efea7ff0bb4',
+    image: 'photo-1504674900247-0877df9cc836',
     tag: 'Weekend special',
     keywords: ['kebab', 'lamb', 'meat', 'grilled', 'spicy', 'middle eastern'],
   },

@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { defaultMenuItems } from '../entities/restaurant/model'
 import { selectItem, submitOrder as submitOrderThunk } from '../entities/order/orderSlice'
 import { updateProfile } from '../entities/user/userSlice'
 import { useCart } from '../app/context/useCart'
+import { CartIcon } from '../features/cart/CartIcon'
 import { CartPage } from '../features/cart/CartPage'
 import { CheckoutModal } from '../features/order-by-prompt/CheckoutModal'
 import { FoodGrid } from '../features/order-by-prompt/FoodGrid'
 import { OrderSummary } from '../features/order-by-prompt/OrderSummary'
 import { PromptHero } from '../features/order-by-prompt/PromptHero'
 import { useOrderPrompt } from '../features/order-by-prompt/useOrderPrompt'
-import { usePollFeed } from '../features/order-by-prompt/usePollFeed'
+import { useStartupMenu } from '../features/order-by-prompt/useStartupMenu'
 import { OrderStatus } from '../features/order-status/OrderStatus'
 import { useOrderTracking } from '../features/order-status/useOrderTracking'
 import { NearbyRestaurants } from '../features/nearby-restaurants/NearbyRestaurants'
@@ -29,11 +29,9 @@ export function HomePage() {
   const [cartOpen, setCartOpen] = useState(false)
   const { items: cartItems, addItem, removeItem } = useCart()
   const trackingError = useOrderTracking(order)
-  const feed = usePollFeed()
+  const startupMenu = useStartupMenu()
 
-  // Use backend/LLM results after search; feed is shown before the first search.
-  const feedItems = feed.items.length ? feed.items : defaultMenuItems
-  const items = prompt.status === 'idle' ? feedItems : prompt.suggestions
+  const items = prompt.status === 'idle' ? startupMenu.items : prompt.suggestions
 
   function addToCart(item) {
     dispatch(selectItem(item))
@@ -92,7 +90,7 @@ export function HomePage() {
           </div>
           <Account />
           <button aria-label={`Open shopping cart${cartItems.length ? `, ${cartItems.length} item${cartItems.length === 1 ? '' : 's'}` : ''}`} className="relative grid h-11 w-11 place-items-center rounded-full border border-[#d9e1d5] bg-white text-lg text-[#456b49] shadow-sm hover:bg-[#eef2eb]" onClick={() => setCartOpen(true)} type="button">
-            🛒{cartItems.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#456b49] px-1 text-[10px] font-bold text-white">{cartItems.length}</span>}
+            <CartIcon className="h-6 w-6" />{cartItems.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#456b49] px-1 text-[10px] font-bold text-white">{cartItems.length}</span>}
           </button>
         </div>
       </header>
