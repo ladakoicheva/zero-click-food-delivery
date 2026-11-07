@@ -1,0 +1,94 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import { generateMenuItems } from '../src/modules/restaurants/menuGenerator.js'
+
+async function generateMockedMenu({ dishName, category, caseName }) {
+  const originalFetch = globalThis.fetch
+  const originalGroqKey = process.env.GROQ_API_KEY
+  let fetchCalls = 0
+  process.env.GROQ_API_KEY = 'menu-image-regression-test-only'
+
+  globalThis.fetch = async (url, options) => {
+    fetchCalls++
+    assert.match(String(url), /api\.groq\.com\/openai\/v1\/chat\/completions$/)
+    const request = JSON.parse(options.body)
+    const prompt = request.messages[1].content
+    assert.ok(prompt.includes(`The user is looking for: "${caseName}"`))
+
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              items: [{
+                id: `menu-image-${caseName}`,
+                name: dishName,
+                description: 'Mocked image-selection regression dish.',
+                price: 15,
+                prepTime: 20,
+                rating: 4.5,
+                tag: 'Test',
+                dietary: [],
+              }],
+            }),
+          },
+        }],
+      }),
+    }
+  }
+
+  try {
+    const restaurant = {
+      id: `menu-image-${caseName}`,
+      name: `Menu Image Regression ${caseName}`,
+      lat: 50.45,
+      lng: 30.52,
+    }
+    const result = await generateMenuItems([restaurant], {
+      cleanQuery: caseName,
+      category,
+      dietary: [],
+      maxBudget: null,
+    })
+
+    assert.equal(fetchCalls, 1)
+    assert.equal(result?.source, 'llm')
+    assert.equal(result?.items[0]?.name, dishName)
+    return result.items[0].image
+  } finally {
+    globalThis.fetch = originalFetch
+    if (originalGroqKey === undefined) delete process.env.GROQ_API_KEY
+    else process.env.GROQ_API_KEY = originalGroqKey
+  }
+}
+
+test('dish-name keyword takes priority over the broader category', async () => {
+  const image = await generateMockedMenu({
+    dishName: 'Chicken Wrap',
+    category: 'chicken',
+    caseName: `menu-image-wrap-${Date.now()}-${Math.random()}`,
+  })
+
+  assert.equal(image, 'photo-1626700051175-6818013e1d4f')
+})
+
+test('category image is used when the dish name has no mapped keyword', async () => {
+  const image = await generateMockedMenu({
+    dishName: 'Chef Tasting Plate',
+    category: 'sushi',
+    caseName: `menu-image-category-${Date.now()}-${Math.random()}`,
+  })
+
+  assert.equal(image, 'photo-1579871494447-9811cf80d66c')
+})
+
+test('default image is used when neither dish name nor category matches', async () => {
+  const image = await generateMockedMenu({
+    dishName: 'Chef Tasting Plate',
+    category: 'comfort food',
+    caseName: `menu-image-default-${Date.now()}-${Math.random()}`,
+  })
+
+  assert.equal(image, 'photo-1504674900247-0877df9cc836')
+})
