@@ -1,13 +1,27 @@
 import crypto from 'node:crypto';
 import { findMenuItem, findOrder, insertOrder } from '../../database/database.js'
+import { findGeneratedItem } from '../restaurants/runtimeMenu.js'
+import { findRuntimeOrder, saveRuntimeOrder } from './runtimeOrders.js'
 import { getOrderStatus } from "./helpers.js";
 
 export const createOrder = (request, response) => {
   
   const PAYMENT_METHODS = new Set(['on_delivery', 'demo_card']);
-  const { itemId, customerName, address, paymentMethod } = request.body || {}
-  const item = findMenuItem(itemId)
-  if (!item) return response.status(400).json({ error: 'Choose a dish from the menu.' })
+  const { itemId, itemIds, customerName, address, paymentMethod } = request.body || {}
+  if (itemIds !== undefined && itemId !== undefined) {
+    return response.status(400).json({ error: 'Choose either one dish or a list of dishes.' })
+  }
+  const ids = itemIds === undefined ? [itemId] : itemIds
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 ||
+      ids.some((id) => typeof id !== 'string' || !id.trim()) || new Set(ids).size !== ids.length) {
+    return response.status(400).json({ error: 'Choose between 1 and 100 distinct dishes from the menu.' })
+  }
+  const entries = ids.map((id) => {
+    const generated = findGeneratedItem(id)
+    return { item: generated ?? findMenuItem(id), generated: Boolean(generated) }
+  })
+  if (entries.some(({ item }) => !item)) return response.status(400).json({ error: 'Some selected dishes are no longer available. Remove them or search again.' })
+  const item = entries[0].item
   if (typeof customerName !== 'string' || customerName.trim().length < 2 || customerName.trim().length > 80) {
     return response.status(400).json({ error: 'Enter a name between 2 and 80 characters.' })
   }
@@ -19,7 +33,10 @@ export const createOrder = (request, response) => {
   }
 
   const createdAt = Date.now()
-  const trackingNumber = `SPN-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
+  let trackingNumber
+  do {
+    trackingNumber = `SPN-${crypto.randomBytes(3).toString('hex').toUpperCase()}`
+  } while (findRuntimeOrder(trackingNumber) || findOrder(trackingNumber))
   const order = {
     trackingNumber,
     customerName: customerName.trim(),
@@ -35,24 +52,42 @@ export const createOrder = (request, response) => {
     },
     createdAt: new Date(createdAt).toISOString(),
   }
-  insertOrder({
-    trackingNumber,
-    customerName: order.customerName,
-    address: order.address,
-    paymentMethod: order.paymentMethod,
-    paymentStatus: order.paymentStatus,
-    status: order.status,
-    restaurantId: item.restaurant_id,
-    menuItemId: item.id,
-    totalAmount: item.price,
-    createdAt: order.createdAt,
-    createdAtMs: createdAt,
-  })
+  if (entries.length > 1) {
+    order.items = entries.map(({ item }) => ({
+      id: item.id,
+      name: item.name,
+      restaurant: item.restaurant,
+      price: item.price,
+    }))
+    order.totalAmount = Math.round(order.items.reduce((sum, entry) => sum + entry.price, 0) * 100) / 100
+  }
+  if (entries.length > 1 || entries[0].generated) {
+    saveRuntimeOrder({ ...order, createdAtMs: createdAt })
+  } else {
+    insertOrder({
+      trackingNumber,
+      customerName: order.customerName,
+      address: order.address,
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      status: order.status,
+      restaurantId: item.restaurant_id,
+      menuItemId: item.id,
+      totalAmount: item.price,
+      createdAt: order.createdAt,
+      createdAtMs: createdAt,
+    })
+  }
 
   return response.status(201).json({ order })
 }
 
 export const getStatus=(request, response) => {
+    const runtimeOrder = findRuntimeOrder(request.params.trackingNumber)
+    if (runtimeOrder) {
+      const { createdAtMs, ...order } = runtimeOrder
+      return response.json({ order: { ...order, status: getOrderStatus(createdAtMs) }, demo: true })
+    }
     const storedOrder = findOrder(request.params.trackingNumber);
     if (!storedOrder) return response.status(404).json({ error: 'No order found with that tracking number.' });
     const { createdAtMs, itemId, itemName, itemRestaurant, itemPrice, ...publicOrder } = storedOrder;

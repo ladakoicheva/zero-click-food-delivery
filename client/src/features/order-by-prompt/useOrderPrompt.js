@@ -1,5 +1,6 @@
 import { useDispatch, useSelector } from 'react-redux'
-import { searchSuggestions, setPromptError, setQuery } from './promptSlice'
+import { searchSuggestions, setQuery } from './promptSlice'
+import { DEMO_LOCATION } from '../../shared/lib/demoLocation'
 
 export function useOrderPrompt() {
   const dispatch = useDispatch()
@@ -7,17 +8,14 @@ export function useOrderPrompt() {
 
   function submitPrompt(event) {
     event.preventDefault()
-    if (!query.trim()) {
-      dispatch(setPromptError('Tell us what you’re craving and we’ll find something for you.'))
-      return
-    }
+    if (!query.trim()) return
 
-    dispatch(searchSuggestions(query.trim()))
+    dispatch(searchSuggestions({ query: query.trim(), ...DEMO_LOCATION }))
   }
 
   function updateQuery(value) {
     dispatch(setQuery(value))
   }
 
-  return { query, setQuery: updateQuery, suggestions, loading: status === 'loading', error, submitPrompt }
+  return { query, setQuery: updateQuery, suggestions, status, loading: status === 'loading', error, submitPrompt }
 }
