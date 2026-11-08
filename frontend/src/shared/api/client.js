@@ -1,5 +1,9 @@
+// In production (Vercel), VITE_API_URL points to the Vultr backend.
+// In development, it's empty so Vite's proxy handles /api/* → localhost:3000.
+const BASE_URL = import.meta.env.VITE_API_URL || ''
+
 async function request(url, options) {
-  const response = await fetch(url, options)
+  const response = await fetch(`${BASE_URL}${url}`, options)
   if (!response.headers.get('content-type')?.includes('application/json')) {
     throw new Error('The server returned an unexpected response. Check that the backend is running and up to date.')
   }
@@ -24,7 +28,7 @@ export function findSuggestions({ query, lat, lng }) {
 export async function fetchFeed(etag = null) {
   const headers = {}
   if (etag) headers['If-None-Match'] = etag
-  const response = await fetch('/api/restaurants/feed', { headers })
+  const response = await fetch(`${BASE_URL}/api/restaurants/feed`, { headers })
   // 304 = nothing changed — caller handles this
   if (response.status === 304) return null
   if (!response.ok) throw new Error('Feed request failed.')
