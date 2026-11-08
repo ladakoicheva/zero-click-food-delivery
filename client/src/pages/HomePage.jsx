@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { selectItem, submitOrder as submitOrderThunk } from '../entities/order/orderSlice'
+import { clearOrderError, selectItem, submitOrder as submitOrderThunk } from '../entities/order/orderSlice'
 import { updateProfile } from '../entities/user/userSlice'
 import { useCart } from '../app/context/useCart'
 import { CartIcon } from '../features/cart/CartIcon'
@@ -27,7 +27,9 @@ export function HomePage() {
   const form = useSelector((state) => state.user)
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [cartOpen, setCartOpen] = useState(false)
-  const { items: cartItems, addItem, removeItem } = useCart()
+  const { items: cartItems, storageError, addItem, removeItem } = useCart()
+  const [selectedCartIds, setSelectedCartIds] = useState(() => cartItems.map((item) => item.id))
+  const [checkoutItems, setCheckoutItems] = useState([])
   const trackingError = useOrderTracking(order)
   const startupMenu = useStartupMenu()
 
@@ -36,16 +38,26 @@ export function HomePage() {
   function addToCart(item) {
     dispatch(selectItem(item))
     addItem(item)
+    setSelectedCartIds((ids) => ids.includes(item.id) ? ids : [...ids, item.id])
+  }
+
+  function openCheckout(items) {
+    dispatch(clearOrderError())
+    setCheckoutItems(items)
+    setCheckoutOpen(true)
   }
 
   async function submitOrder(event) {
     event.preventDefault()
-    const result = await dispatch(submitOrderThunk({ itemId: selectedItem.id, customerName: form.customerName.trim(), address: form.address.trim(), paymentMethod: form.paymentMethod }))
+    const ids = checkoutItems.map((item) => item.id)
+    const result = await dispatch(submitOrderThunk({ ...(ids.length === 1 ? { itemId: ids[0] } : { itemIds: ids }), customerName: form.customerName.trim(), address: form.address.trim(), paymentMethod: form.paymentMethod }))
     if (submitOrderThunk.fulfilled.match(result)) {
       setCheckoutOpen(false)
       setCartOpen(false)
-      removeItem(selectedItem.id)
-      dispatch(selectItem(null))
+      ids.forEach(removeItem)
+      setSelectedCartIds((current) => current.filter((id) => !ids.includes(id)))
+      if (ids.includes(selectedItem?.id)) dispatch(selectItem(null))
+      setCheckoutItems([])
     }
   }
 
@@ -53,24 +65,25 @@ export function HomePage() {
     <CartPage
       items={cartItems}
       onBack={() => setCartOpen(false)}
-      onCheckout={() => {
+      onCheckout={(items) => {
         setCartOpen(false)
-        setCheckoutOpen(true)
+        openCheckout(items)
       }}
       onRemove={(id) => {
         removeItem(id)
+        setSelectedCartIds((ids) => ids.filter((selectedId) => selectedId !== id))
         if (selectedItem?.id === id) dispatch(selectItem(null))
       }}
-      onSelect={(item) => dispatch(selectItem(item))}
-      selectedItem={cartItems.find((item) => item.id === selectedItem?.id)}
+      selectedIds={selectedCartIds}
+      onSelectionChange={setSelectedCartIds}
     />
   ) : (
     <main className="mx-auto w-full max-w-7xl px-5 pb-20 sm:px-8">
       <PromptHero query={prompt.query} loading={prompt.loading} onQueryChange={prompt.setQuery} onSubmit={prompt.submitPrompt} />
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <FoodGrid error={prompt.error} items={items} selectedItem={selectedItem} onSelect={addToCart} />
-        <aside className="lg:sticky lg:top-6">
-          {order ? <OrderStatus order={order} trackingError={trackingError} /> : <OrderSummary item={selectedItem} onCheckout={() => setCheckoutOpen(true)} />}
+        <FoodGrid error={prompt.error} items={items} loading={prompt.loading} selectedItem={selectedItem} onSelect={addToCart} />
+        <aside className="lg:sticky lg:top-28">
+          {order ? <OrderStatus order={order} trackingError={trackingError} /> : <OrderSummary item={selectedItem} onCheckout={() => openCheckout([selectedItem])} />}
         </aside>
       </div>
       <NearbyRestaurants />
@@ -80,22 +93,25 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#f7f6f2] text-[#20251f]">
-      <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
-        <a className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight" href="/" aria-label="Spoon, home">
-          <span className="brand-mark">S</span>spoon
-        </a>
-        <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-[#626960] shadow-sm sm:flex">
-            <span aria-hidden="true">⌖</span><span>Kyiv</span><span className="text-[#a2a69f]">·</span><span>Delivery 25–40 min</span>
+      <header className="sticky top-0 z-30 bg-[#f7f6f2]">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
+          <a className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight" href="/" aria-label="Spoon, home">
+            <span className="brand-mark">S</span>spoon
+          </a>
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-full bg-white px-3 py-2 text-sm text-[#626960] shadow-sm sm:flex">
+              <span aria-hidden="true">⌖</span><span>Kyiv</span><span className="text-[#a2a69f]">·</span><span>Delivery 25–40 min</span>
+            </div>
+            <Account />
+            <button aria-label={`Open shopping cart${cartItems.length ? `, ${cartItems.length} item${cartItems.length === 1 ? '' : 's'}` : ''}`} className="relative grid h-11 w-11 place-items-center rounded-full border border-[#d9e1d5] bg-white text-lg text-[#456b49] shadow-sm hover:bg-[#eef2eb]" onClick={() => setCartOpen(true)} type="button">
+              <CartIcon className="h-6 w-6" />{cartItems.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#456b49] px-1 text-[10px] font-bold text-white">{cartItems.length}</span>}
+            </button>
           </div>
-          <Account />
-          <button aria-label={`Open shopping cart${cartItems.length ? `, ${cartItems.length} item${cartItems.length === 1 ? '' : 's'}` : ''}`} className="relative grid h-11 w-11 place-items-center rounded-full border border-[#d9e1d5] bg-white text-lg text-[#456b49] shadow-sm hover:bg-[#eef2eb]" onClick={() => setCartOpen(true)} type="button">
-            <CartIcon className="h-6 w-6" />{cartItems.length > 0 && <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-[#456b49] px-1 text-[10px] font-bold text-white">{cartItems.length}</span>}
-          </button>
         </div>
       </header>
+      {storageError && <p className="mx-auto max-w-7xl px-5 pt-3 text-sm text-[#a04532] sm:px-8" role="alert">{storageError}</p>}
       {page}
-      {checkoutOpen && selectedItem && <CheckoutModal error={orderError} form={form} item={selectedItem} placing={placing} setForm={(nextForm) => dispatch(updateProfile(nextForm))} onClose={() => setCheckoutOpen(false)} onSubmit={submitOrder} />}
+      {checkoutOpen && checkoutItems.length > 0 && <CheckoutModal error={orderError} form={form} items={checkoutItems} placing={placing} setForm={(nextForm) => dispatch(updateProfile(nextForm))} onClose={() => setCheckoutOpen(false)} onSubmit={submitOrder} />}
     </div>
   )
 }

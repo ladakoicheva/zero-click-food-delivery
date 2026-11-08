@@ -7,10 +7,21 @@ import { getOrderStatus } from "./helpers.js";
 export const createOrder = (request, response) => {
   
   const PAYMENT_METHODS = new Set(['on_delivery', 'demo_card']);
-  const { itemId, customerName, address, paymentMethod } = request.body || {}
-  const generatedItem = findGeneratedItem(itemId)
-  const item = generatedItem ?? findMenuItem(itemId)
-  if (!item) return response.status(400).json({ error: 'Choose a dish from the menu.' })
+  const { itemId, itemIds, customerName, address, paymentMethod } = request.body || {}
+  if (itemIds !== undefined && itemId !== undefined) {
+    return response.status(400).json({ error: 'Choose either one dish or a list of dishes.' })
+  }
+  const ids = itemIds === undefined ? [itemId] : itemIds
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 ||
+      ids.some((id) => typeof id !== 'string' || !id.trim()) || new Set(ids).size !== ids.length) {
+    return response.status(400).json({ error: 'Choose between 1 and 100 distinct dishes from the menu.' })
+  }
+  const entries = ids.map((id) => {
+    const generated = findGeneratedItem(id)
+    return { item: generated ?? findMenuItem(id), generated: Boolean(generated) }
+  })
+  if (entries.some(({ item }) => !item)) return response.status(400).json({ error: 'Some selected dishes are no longer available. Remove them or search again.' })
+  const item = entries[0].item
   if (typeof customerName !== 'string' || customerName.trim().length < 2 || customerName.trim().length > 80) {
     return response.status(400).json({ error: 'Enter a name between 2 and 80 characters.' })
   }
@@ -41,7 +52,16 @@ export const createOrder = (request, response) => {
     },
     createdAt: new Date(createdAt).toISOString(),
   }
-  if (generatedItem) {
+  if (entries.length > 1) {
+    order.items = entries.map(({ item }) => ({
+      id: item.id,
+      name: item.name,
+      restaurant: item.restaurant,
+      price: item.price,
+    }))
+    order.totalAmount = Math.round(order.items.reduce((sum, entry) => sum + entry.price, 0) * 100) / 100
+  }
+  if (entries.length > 1 || entries[0].generated) {
     saveRuntimeOrder({ ...order, createdAtMs: createdAt })
   } else {
     insertOrder({
